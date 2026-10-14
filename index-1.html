@@ -1,0 +1,583 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#3b4cca">
+<title>قارئ النصوص</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/* التصميم: صفحة قراءة بخط نسخ كبير، والجملة الحالية مظللة، ونقطة البداية بخط سفلي، وشريط تحكم ثابت أسفل الشاشة */
+:root{
+  --bg:#f5f6fa;
+  --surface:#ffffff;
+  --fg:#16192b;
+  --muted:#5f6580;
+  --line:#d9dce8;
+  --accent:#3b4cca;
+  --accent-fg:#ffffff;
+  --now:#ffe6a0;
+  --danger:#b3261e;
+  --read-size:22px;
+  --font-read:"Amiri","Traditional Arabic",serif;
+  --font-ui:"Tajawal",system-ui,-apple-system,"Segoe UI",sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1220;--surface:#181c30;--fg:#e8eaf6;--muted:#9aa1c4;--line:#2c3150;
+    --accent:#8d9bff;--accent-fg:#0b0f24;--now:#5c4b12;--danger:#ff8a80;color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f1220;--surface:#181c30;--fg:#e8eaf6;--muted:#9aa1c4;--line:#2c3150;
+  --accent:#8d9bff;--accent-fg:#0b0f24;--now:#5c4b12;--danger:#ff8a80;color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{
+  background:var(--bg);color:var(--fg);font-family:var(--font-ui);font-size:16px;line-height:1.6;
+  padding-block:max(16px,env(safe-area-inset-top,0px)) calc(24px + env(safe-area-inset-bottom,0px));
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+  min-height:100vh;
+}
+body.with-bar{padding-bottom:calc(228px + env(safe-area-inset-bottom,0px))}
+main{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+h1{font-size:1.5rem;margin:6px 0 0;font-weight:700;text-wrap:balance}
+.lead{margin:0;color:var(--muted);font-size:.95rem}
+button,input,select,textarea{font:inherit;color:inherit}
+button{
+  font-weight:700;border-radius:10px;border:1.5px solid var(--line);background:var(--surface);
+  padding:0 16px;min-height:48px;cursor:pointer;
+}
+button.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+button:disabled{opacity:.5;cursor:default}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.row>*{min-width:0}
+.grow{flex:1}
+
+/* الإعدادات */
+details{background:var(--surface);border:1.5px solid var(--line);border-radius:12px;padding:0 14px}
+summary{min-height:48px;display:flex;align-items:center;font-weight:700;cursor:pointer}
+.settings{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;padding:4px 0 16px}
+.settings .wide{grid-column:1/-1}
+.f{display:flex;flex-direction:column;gap:6px;min-width:0}
+.f label{font-size:.82rem;font-weight:700;letter-spacing:.02em;color:var(--muted)}
+.f input,.f select{
+  background:var(--bg);border:1.5px solid var(--line);border-radius:10px;padding:10px 12px;min-height:46px;width:100%;
+}
+.f input.ltr{direction:ltr;text-align:left}
+.hint{font-size:.82rem;color:var(--muted);margin:0}
+.hint a{color:var(--accent)}
+
+/* التبويبات */
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1.5px solid var(--line);border-radius:12px;overflow:hidden;background:var(--surface)}
+.tabs button{border:0;border-radius:0;background:transparent;color:var(--muted)}
+.tabs button[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg)}
+
+/* المحرر */
+textarea#ed{
+  width:100%;min-height:52vh;resize:vertical;background:var(--surface);border:1.5px solid var(--line);
+  border-radius:12px;padding:14px;font-family:var(--font-read);font-size:var(--read-size);line-height:1.9;
+}
+.meta{display:flex;justify-content:space-between;font-size:.85rem;color:var(--muted);font-variant-numeric:tabular-nums}
+
+/* القارئ */
+#text{
+  background:var(--surface);border:1.5px solid var(--line);border-radius:12px;padding:16px;
+  font-family:var(--font-read);font-size:var(--read-size);line-height:2.1;
+}
+#text p{margin:0 0 1em}
+#text p:last-child{margin-bottom:0}
+.seg{cursor:pointer;border-radius:6px;padding:2px 0;-webkit-box-decoration-break:clone;box-decoration-break:clone}
+.seg:hover{background:color-mix(in srgb,var(--accent) 12%,transparent)}
+.seg.now{background:var(--now)}
+.seg.start{text-decoration:underline;text-decoration-color:var(--accent);text-decoration-thickness:3px;text-underline-offset:7px}
+
+/* شريط التحكم */
+.bar{
+  position:fixed;inset-inline:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);
+  padding-top:10px;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+}
+.bar-in{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:8px}
+.status{min-height:1.5em;font-size:.9rem;color:var(--muted)}
+.status.err{color:var(--danger)}
+.pos{display:flex;flex-direction:column;gap:2px}
+.pos-top{display:flex;justify-content:space-between;gap:8px;font-size:.85rem;font-weight:700;font-variant-numeric:tabular-nums}
+.pos-prev{font-size:.82rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+input[type="range"]{width:100%;accent-color:var(--accent);min-height:32px;margin:0}
+.ctrl{display:flex;gap:8px}
+.ctrl button{flex:1}
+.ctrl button.primary{flex:2}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<main>
+  <div>
+    <h1>قارئ النصوص</h1>
+    <p class="lead">الصق نصاً، اختر الجملة التي تبدأ منها، ودع Gemini يقرؤه بصوت طبيعي.</p>
+  </div>
+
+  <details id="settings">
+    <summary>الإعدادات والمفتاح</summary>
+    <div class="settings">
+      <div class="f wide">
+        <label for="key">مفتاح Gemini API</label>
+        <input id="key" class="ltr" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="AIza...">
+        <p class="hint">يُحفظ المفتاح في متصفحك فقط ويُرسل إلى Google وحدها. يمكنك إنشاء مفتاح من <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>.</p>
+      </div>
+      <div class="f">
+        <label for="voice">الصوت</label>
+        <select id="voice"></select>
+      </div>
+      <div class="f">
+        <label for="model">النموذج</label>
+        <select id="model"></select>
+      </div>
+      <div class="f wide">
+        <label for="style">أسلوب الإلقاء (اختياري)</label>
+        <input id="style" type="text" placeholder="مثال: بهدوء ووضوح، بنبرة دافئة">
+      </div>
+      <div class="f">
+        <label for="speed">سرعة التشغيل</label>
+        <select id="speed">
+          <option value="0.75">0.75×</option><option value="1">1×</option><option value="1.25">1.25×</option>
+          <option value="1.5">1.5×</option><option value="1.75">1.75×</option><option value="2">2×</option>
+        </select>
+      </div>
+      <div class="f">
+        <label for="size">حجم الخط</label>
+        <select id="size">
+          <option value="18">صغير</option><option value="22">متوسط</option><option value="26">كبير</option><option value="30">كبير جداً</option>
+        </select>
+      </div>
+    </div>
+  </details>
+
+  <div class="tabs" role="group" aria-label="العرض">
+    <button type="button" id="tabEdit" aria-pressed="true">النص</button>
+    <button type="button" id="tabRead" aria-pressed="false">القراءة</button>
+  </div>
+
+  <section id="editor">
+    <textarea id="ed" dir="auto" aria-label="النص المراد قراءته">القراءة بصوت عالٍ تساعد على التركيز وتثبيت المعلومات في الذاكرة. كثيرون يستمعون إلى النصوص أثناء المشي أو الطبخ أو التنقل، فيستفيدون من وقت كان سيضيع.
+
+يتيح لك هذا الموقع أن تلصق أي نص، ثم تختار الجملة التي تريد أن تبدأ منها. اضغط على أي جملة في صفحة القراءة لتعلّم نقطة البداية، أو حرّك المنزلق في الأسفل.
+
+بعد ذلك اضغط زر التشغيل، وسيقرأ Gemini النص بصوت طبيعي مع تمييز الجملة الجاري قراءتها.</textarea>
+    <div class="meta" style="margin-top:8px"><span id="words">0 كلمة</span><span id="chars">0 حرف</span></div>
+    <div class="row" style="margin-top:12px">
+      <button type="button" id="paste">لصق</button>
+      <button type="button" id="clear">مسح</button>
+      <button type="button" id="prep" class="grow">تجهيز القراءة</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button type="button" id="fromCursor" class="primary grow">ابدأ القراءة من موضع المؤشر</button>
+    </div>
+    <p class="hint" style="margin-top:8px">ضع المؤشر داخل النص في المكان الذي تريد البدء منه ثم اضغط الزر الأخير.</p>
+    <div class="status" id="edStatus" role="status" aria-live="polite"></div>
+  </section>
+
+  <section id="reader" hidden>
+    <div id="text" aria-label="النص للقراءة"></div>
+  </section>
+</main>
+
+<div class="bar" id="bar" hidden>
+  <div class="bar-in">
+    <div class="status" id="status" role="status" aria-live="polite"></div>
+    <div class="pos">
+      <div class="pos-top"><span id="posLabel">تبدأ من الجملة 1 من 1</span></div>
+      <div class="pos-prev" id="posPrev" dir="auto"></div>
+      <input type="range" id="slider" min="0" max="0" value="0" step="1" aria-label="موضع بدء القراءة">
+    </div>
+    <div class="ctrl">
+      <button type="button" id="prev" disabled>السابق</button>
+      <button type="button" id="play" class="primary">تشغيل</button>
+      <button type="button" id="next" disabled>التالي</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var MAXSEG = 420;
+var MAXCHUNK = 380;
+
+function breakLong(s, max){
+  var out = [], rest = s;
+  while(rest.length > max){
+    var cut = -1, seps = ['، ', ', ', '؛ ', '; ', ': ', ' '];
+    for(var k = 0; k < seps.length; k++){
+      var i = rest.lastIndexOf(seps[k], max);
+      if(i > max * 0.4){ cut = i + seps[k].length; break; }
+    }
+    if(cut < 0) cut = max;
+    out.push(rest.slice(0, cut));
+    rest = rest.slice(cut);
+  }
+  if(rest) out.push(rest);
+  return out;
+}
+
+function splitSegments(text){
+  text = text.replace(/\r\n?/g, '\n');
+  var segs = [], para = -1, lineRe = /[^\n]+/g, lm;
+  while((lm = lineRe.exec(text))){
+    var line = lm[0], base = lm.index, produced = false;
+    var sre = /[^\n]+?(?:[.!?؟…]+["'»”’)\]]*(?=\s|$)|$)\s*/g, sm;
+    while((sm = sre.exec(line))){
+      var raw = sm[0], cur = base + sm.index;
+      var pieces = breakLong(raw, MAXSEG);
+      for(var k = 0; k < pieces.length; k++){
+        var pc = pieces[k], t = pc.trim();
+        if(t){
+          if(!produced){ para++; produced = true; }
+          segs.push({ text: t, off: cur, end: cur + pc.length, para: para });
+        }
+        cur += pc.length;
+      }
+    }
+  }
+  return segs;
+}
+
+function makeChunk(segs, i, maxChunk){
+  var end = i, len = 0, para = segs[i].para;
+  while(end < segs.length && segs[end].para === para){
+    var l = segs[end].text.length + 1;
+    if(end > i && len + l > maxChunk) break;
+    len += l; end++;
+  }
+  var parts = [];
+  for(var k = i; k < end; k++) parts.push(segs[k].text);
+  return { start: i, end: end, text: parts.join(' ') };
+}
+
+function wavFromPcm(pcm, rate){
+  var n = pcm.length, buf = new ArrayBuffer(44 + n), v = new DataView(buf);
+  function str(o, s){ for(var i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); }
+  str(0, 'RIFF'); v.setUint32(4, 36 + n, true); str(8, 'WAVE'); str(12, 'fmt ');
+  v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+  str(36, 'data'); v.setUint32(40, n, true);
+  new Uint8Array(buf, 44).set(pcm);
+  return new Uint8Array(buf);
+}
+
+function b64ToBytes(b64){
+  var bin = atob(b64), out = new Uint8Array(bin.length);
+  for(var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+function audioToBlob(a){
+  var bytes = b64ToBytes(a.data);
+  var isWav = bytes.length > 12 && String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]) === 'RIFF';
+  if(isWav) return new Blob([bytes], { type: 'audio/wav' });
+  var m = /rate=(\d+)/.exec(a.mime_type || '');
+  return new Blob([wavFromPcm(bytes, m ? +m[1] : 24000)], { type: 'audio/wav' });
+}
+
+function findAudio(o){
+  var found = null;
+  (function walk(x){
+    if(!x || typeof x !== 'object') return;
+    if(x.type === 'audio' && typeof x.data === 'string') found = x;
+    for(var k in x){ if(Object.prototype.hasOwnProperty.call(x, k)) walk(x[k]); }
+  })(o);
+  return found;
+}
+
+/*APP*/
+(function(){
+  'use strict';
+  var $ = function(id){ return document.getElementById(id); };
+
+  var VOICES = ['Kore','Puck','Charon','Zephyr','Fenrir','Leda','Orus','Aoede','Callirrhoe','Autonoe','Enceladus','Iapetus','Umbriel','Algieba','Despina','Erinome','Algenib','Rasalgethi','Laomedeia','Achernar','Alnilam','Schedar','Gacrux','Pulcherrima','Achird','Zubenelgenubi','Vindemiatrix','Sadachbia','Sadaltager','Sulafat'];
+  var MODELS = [['gemini-3.8-flash-tts','Flash (جودة أعلى)'], ['gemini-3.8-flash-lite-tts','Flash Lite (أسرع وأخف)']];
+  var ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/interactions';
+
+  var S = { key: '', voice: 'Kore', model: MODELS[0][0], style: '', speed: 1, size: 22 };
+  try { Object.assign(S, JSON.parse(localStorage.getItem('qari-gemini') || '{}')); } catch(e){}
+  function save(){ try { localStorage.setItem('qari-gemini', JSON.stringify(S)); } catch(e){} }
+
+  var ed = $('ed'), host = $('text'), slider = $('slider');
+  var segs = [], spans = [], startIdx = 0, curChunk = null, lastText = null;
+  var state = 'idle', token = 0, pendingResolve = null, silentUrl = null;
+  var cache = new Map();
+  var audio = new Audio();
+  try { audio.preservesPitch = true; audio.mozPreservesPitch = true; audio.webkitPreservesPitch = true; } catch(e){}
+
+  /* ---------- واجهة ---------- */
+  function setStatus(msg, isErr){
+    ['status', 'edStatus'].forEach(function(id){
+      var el = $(id); el.textContent = msg || ''; el.className = 'status' + (isErr ? ' err' : '');
+    });
+  }
+  function setState(s){
+    state = s;
+    var p = $('play');
+    p.textContent = s === 'playing' ? 'إيقاف مؤقت' : s === 'paused' ? 'متابعة' : s === 'loading' ? 'جارٍ التجهيز... (إلغاء)' : 'تشغيل';
+    $('prev').disabled = $('next').disabled = (s === 'idle');
+  }
+  function showView(v){
+    $('editor').hidden = v !== 'editor';
+    $('reader').hidden = v !== 'reader';
+    $('bar').hidden = v !== 'reader';
+    $('tabEdit').setAttribute('aria-pressed', String(v === 'editor'));
+    $('tabRead').setAttribute('aria-pressed', String(v === 'reader'));
+    document.body.classList.toggle('with-bar', v === 'reader');
+  }
+  function counts(){
+    var v = ed.value.trim();
+    $('words').textContent = (v ? v.split(/\s+/).length : 0) + ' كلمة';
+    $('chars').textContent = ed.value.length + ' حرف';
+  }
+  var smooth = function(){ return matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'; };
+
+  /* ---------- النص والجمل ---------- */
+  function prepare(keepStart){
+    var text = ed.value;
+    if(!text.trim()){ setStatus('اكتب نصاً أو الصقه أولاً.', true); return false; }
+    segs = splitSegments(text);
+    if(!segs.length){ setStatus('لم أجد جملاً قابلة للقراءة في هذا النص.', true); return false; }
+    if(text !== lastText) startIdx = 0;
+    lastText = text;
+    startIdx = Math.max(0, Math.min(startIdx, segs.length - 1));
+    render();
+    return true;
+  }
+  function render(){
+    host.textContent = '';
+    var p = null, last = -1;
+    segs.forEach(function(s, i){
+      if(s.para !== last){ p = document.createElement('p'); p.dir = 'auto'; host.appendChild(p); last = s.para; }
+      var sp = document.createElement('span');
+      sp.className = 'seg'; sp.dataset.i = String(i); sp.textContent = s.text;
+      p.appendChild(sp); p.appendChild(document.createTextNode(' '));
+    });
+    spans = host.querySelectorAll('.seg');
+    slider.max = String(segs.length - 1);
+    slider.disabled = segs.length < 2;
+    setStart(startIdx, false);
+  }
+  function setStart(i, scroll){
+    startIdx = Math.max(0, Math.min(i, segs.length - 1));
+    host.querySelectorAll('.start').forEach(function(n){ n.classList.remove('start'); });
+    if(spans[startIdx]){
+      spans[startIdx].classList.add('start');
+      if(scroll) spans[startIdx].scrollIntoView({ block: 'center', behavior: smooth() });
+    }
+    slider.value = String(startIdx);
+    $('posLabel').textContent = 'تبدأ من الجملة ' + (startIdx + 1) + ' من ' + segs.length;
+    var t = segs[startIdx] ? segs[startIdx].text : '';
+    $('posPrev').textContent = t.length > 60 ? t.slice(0, 60) + '…' : t;
+  }
+  function clearNow(){ host.querySelectorAll('.now').forEach(function(n){ n.classList.remove('now'); }); }
+  function highlight(ch){
+    clearNow();
+    for(var k = ch.start; k < ch.end; k++) if(spans[k]) spans[k].classList.add('now');
+    if(spans[ch.start]) spans[ch.start].scrollIntoView({ block: 'center', behavior: smooth() });
+  }
+  function segIndexAt(pos){
+    var idx = 0;
+    for(var i = 0; i < segs.length; i++){ if(segs[i].off <= pos) idx = i; else break; }
+    return idx;
+  }
+
+  /* ---------- طلب الصوت من Gemini ---------- */
+  function apiError(status, j){
+    var m = j && j.error && j.error.message ? j.error.message : '';
+    var e;
+    if(status === 401 || status === 403) e = 'مفتاح API غير صالح أو غير مسموح له. راجع الإعدادات.';
+    else if(status === 429) e = 'تجاوزت الحصة المسموحة حالياً. انتظر قليلاً ثم أعد المحاولة.';
+    else if(status === 400) e = 'رفض Gemini الطلب. ' + m;
+    else e = 'خطأ من Gemini (' + status + '). ' + m;
+    return new Error(e);
+  }
+  function requestTts(text){
+    var content = { type: 'text', text: text };
+    if(S.style.trim()) content.annotations = [{ type: 'speech_metadata', style: S.style.trim() }];
+    var body = {
+      model: S.model,
+      input: [{ type: 'user_input', content: [content] }],
+      response_format: { type: 'audio' },
+      generation_config: { speech_config: [{ voice: S.voice }] }
+    };
+    return fetch(ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': S.key },
+      body: JSON.stringify(body)
+    }).catch(function(){
+      throw new Error('تعذر الاتصال بـ Gemini. تحقق من الإنترنت.');
+    }).then(function(r){
+      return r.json().catch(function(){ return null; }).then(function(j){
+        if(!r.ok) throw apiError(r.status, j);
+        return j;
+      });
+    }).then(function(j){
+      var a = findAudio(j);
+      if(!a) throw new Error('لم يصل صوت في استجابة Gemini.');
+      return audioToBlob(a);
+    });
+  }
+  function getAudioUrl(ch){
+    var k = [S.model, S.voice, S.style, ch.text].join('\u0001');
+    if(cache.has(k)) return cache.get(k);
+    var p = requestTts(ch.text).then(function(b){ return URL.createObjectURL(b); });
+    cache.set(k, p);
+    p.catch(function(){ cache.delete(k); });
+    if(cache.size > 40){
+      var first = cache.keys().next().value, old = cache.get(first);
+      cache.delete(first);
+      old.then(function(u){ URL.revokeObjectURL(u); }).catch(function(){});
+    }
+    return p;
+  }
+
+  /* ---------- التشغيل ---------- */
+  function unlock(){
+    try {
+      if(!silentUrl) silentUrl = URL.createObjectURL(new Blob([wavFromPcm(new Uint8Array(480), 24000)], { type: 'audio/wav' }));
+      audio.src = silentUrl;
+      var p = audio.play(); if(p && p.catch) p.catch(function(){});
+    } catch(e){}
+  }
+  function stopAll(){
+    token++;
+    audio.onended = audio.onerror = null;
+    audio.pause();
+    if(pendingResolve){ var r = pendingResolve; pendingResolve = null; r(); }
+  }
+  function ensureReady(){
+    if(!S.key){
+      $('settings').open = true; $('key').focus();
+      $('settings').scrollIntoView({ block: 'start' });
+      setStatus('أدخل مفتاح Gemini API في الإعدادات أولاً.', true);
+      return false;
+    }
+    return true;
+  }
+  function finish(){
+    setState('idle'); curChunk = null; clearNow(); setStatus('انتهت القراءة.');
+  }
+  function run(i, my){
+    if(i >= segs.length){ finish(); return; }
+    var ch = makeChunk(segs, i, MAXCHUNK);
+    curChunk = ch;
+    setStatus('جارٍ تجهيز الصوت...');
+    getAudioUrl(ch).then(function(url){
+      if(my !== token) return;
+      if(ch.end < segs.length) getAudioUrl(makeChunk(segs, ch.end, MAXCHUNK)).catch(function(){});
+      highlight(ch);
+      setState('playing'); setStatus('');
+      audio.src = url;
+      audio.defaultPlaybackRate = S.speed; audio.playbackRate = S.speed;
+      return new Promise(function(res){
+        pendingResolve = res;
+        audio.onended = function(){ pendingResolve = null; res(); };
+        audio.onerror = function(){
+          pendingResolve = null;
+          if(my === token){ token++; setState('idle'); setStatus('تعذر تشغيل الصوت. جرّب مرة أخرى.', true); }
+        };
+        var pr = audio.play();
+        if(pr && pr.catch) pr.catch(function(){
+          if(my === token){ setState('paused'); setStatus('اضغط "متابعة" لبدء الصوت.'); }
+        });
+      }).then(function(){
+        if(my !== token) return;
+        run(ch.end, my);
+      });
+    }).catch(function(e){
+      if(my !== token) return;
+      setState('idle'); setStatus(e && e.message ? e.message : 'حدث خطأ غير متوقع.', true);
+    });
+  }
+  function playFrom(i){
+    if(!ensureReady()) return;
+    unlock();
+    stopAll();
+    var my = token;
+    setStart(i, false);
+    setState('loading');
+    run(i, my);
+  }
+  function stopPlayback(){ stopAll(); setState('idle'); clearNow(); curChunk = null; setStatus(''); }
+  function togglePlay(){
+    if(state === 'idle') playFrom(startIdx);
+    else if(state === 'playing'){ audio.pause(); setState('paused'); }
+    else if(state === 'paused'){
+      setState('playing');
+      var pr = audio.play();
+      if(pr && pr.catch) pr.catch(function(){ setState('paused'); });
+    } else stopPlayback();
+  }
+
+  /* ---------- ربط الأحداث ---------- */
+  function startFromCursor(){
+    var pos = ed.selectionStart || 0;
+    if(!prepare(true)) return;
+    var idx = segIndexAt(pos);
+    showView('reader');
+    setStart(idx, true);
+    playFrom(idx);
+  }
+  host.addEventListener('click', function(e){
+    var t = e.target.closest ? e.target.closest('.seg') : null;
+    if(!t) return;
+    var i = +t.dataset.i;
+    if(state === 'idle'){ setStart(i, false); setStatus('ستبدأ القراءة من هنا. اضغط تشغيل.'); }
+    else playFrom(i);
+  });
+  slider.addEventListener('input', function(){ setStart(+slider.value, true); });
+  slider.addEventListener('change', function(){ if(state !== 'idle') playFrom(+slider.value); });
+  $('play').addEventListener('click', togglePlay);
+  $('next').addEventListener('click', function(){
+    var i = curChunk ? curChunk.end : startIdx + 1;
+    if(i >= segs.length) stopPlayback(); else playFrom(i);
+  });
+  $('prev').addEventListener('click', function(){
+    playFrom(Math.max(0, (curChunk ? curChunk.start : startIdx) - 1));
+  });
+  $('tabEdit').addEventListener('click', function(){ stopPlayback(); showView('editor'); });
+  $('tabRead').addEventListener('click', function(){ if(prepare(true)) showView('reader'); });
+  $('prep').addEventListener('click', function(){ if(prepare(false)) showView('reader'); });
+  $('fromCursor').addEventListener('click', startFromCursor);
+  $('clear').addEventListener('click', function(){ ed.value = ''; counts(); ed.focus(); });
+  $('paste').addEventListener('click', function(){
+    if(!navigator.clipboard || !navigator.clipboard.readText){ setStatus('اللصق التلقائي غير متاح هنا. اضغط مطولاً داخل المربع والصق.', true); ed.focus(); return; }
+    navigator.clipboard.readText().then(function(t){ if(t){ ed.value = t; counts(); ed.setSelectionRange(0, 0); } })
+      .catch(function(){ ed.focus(); });
+  });
+  ed.addEventListener('input', counts);
+
+  /* ---------- الإعدادات ---------- */
+  VOICES.forEach(function(v){ var o = document.createElement('option'); o.value = v; o.textContent = v; $('voice').appendChild(o); });
+  MODELS.forEach(function(m){ var o = document.createElement('option'); o.value = m[0]; o.textContent = m[1]; $('model').appendChild(o); });
+  $('key').value = S.key; $('voice').value = S.voice; $('model').value = S.model;
+  $('style').value = S.style; $('speed').value = String(S.speed); $('size').value = String(S.size);
+  document.documentElement.style.setProperty('--read-size', S.size + 'px');
+  $('key').addEventListener('input', function(e){ S.key = e.target.value.trim(); save(); });
+  $('voice').addEventListener('change', function(e){ S.voice = e.target.value; save(); });
+  $('model').addEventListener('change', function(e){ S.model = e.target.value; save(); });
+  $('style').addEventListener('input', function(e){ S.style = e.target.value; save(); });
+  $('speed').addEventListener('change', function(e){
+    S.speed = +e.target.value; save(); audio.defaultPlaybackRate = S.speed; audio.playbackRate = S.speed;
+  });
+  $('size').addEventListener('change', function(e){
+    S.size = +e.target.value; save(); document.documentElement.style.setProperty('--read-size', S.size + 'px');
+  });
+
+  counts();
+  showView('editor');
+})();
+</script>
+</body>
+</html>
